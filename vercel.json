@@ -1,9 +1,4 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "functions": {
-    "api/**/*.{js,ts}": {
-      "runtime": "@vercel/node@3.3.0"
-    }
-  }
+  "installCommand": "npm install"
 }
