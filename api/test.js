@@ -1,6 +1,7 @@
 // 测试端点 —— 验证 API 路由是否正常工作
-export default async function handler(req) {
-  return new Response(JSON.stringify({
+module.exports = async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.status(200).json({
     ok: true,
     message: 'API 正常工作！',
     env: {
@@ -10,8 +11,5 @@ export default async function handler(req) {
       hasUpstashToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
       hasJwtSecret: !!process.env.JWT_SECRET,
     }
-  }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
   });
-}
+};
