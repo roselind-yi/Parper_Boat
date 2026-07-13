@@ -1,6 +1,6 @@
-import { getUserByEmail } from '../../lib/db';
-import { comparePassword } from '../../lib/bcrypt';
-import { generateToken } from '../../lib/jwt';
+import { getUserByEmail } from '../../lib/db.js';
+import { comparePassword } from '../../lib/bcrypt.js';
+import { generateToken } from '../../lib/jwt.js';
 
 export default async function handler(req) {
   if (req.method !== 'POST') {

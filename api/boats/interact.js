@@ -1,5 +1,5 @@
-import { interactBoat } from '../../lib/db';
-import { authenticate } from '../../lib/jwt';
+import { interactBoat } from '../../lib/db.js';
+import { authenticate } from '../../lib/jwt.js';
 
 export default async function handler(req) {
   if (req.method !== 'POST') {

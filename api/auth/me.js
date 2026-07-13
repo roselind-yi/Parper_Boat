@@ -1,4 +1,4 @@
-import { authenticate } from '../../lib/jwt';
+import { authenticate } from '../../lib/jwt.js';
 
 export default async function handler(req) {
   if (req.method !== 'GET') {

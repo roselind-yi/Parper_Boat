@@ -28,10 +28,18 @@ const API = {
       headers,
     });
     
-    const data = await response.json();
+    // 获取响应文本，然后尝试解析为 JSON
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      // 如果不是 JSON 格式，说明服务器返回了 HTML 错误页
+      throw new Error('服务器错误: ' + text.substring(0, 100));
+    }
     
     if (!response.ok) {
-      throw new Error(data.error || 'Request failed');
+      throw new Error(data.error || `请求失败 (${response.status})`);
     }
     
     return data;
