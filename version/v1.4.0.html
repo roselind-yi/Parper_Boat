@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>纸船漂流 v1.2.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --ink:#1a1410;--ink2:#3d3028;--paper:#f5f0e8;--paper2:#ede5d4;
+  --water-body:rgba(110,155,175,0.28);--water-line:rgba(70,115,145,0.45);
+  --red:#b5352a;
+}
+html,body{width:100%;height:100%;background:var(--paper);font-family:'Noto Serif SC',serif;overflow:hidden;touch-action:none;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 50% at 25% 35%,rgba(175,155,115,0.07) 0%,transparent 100%),radial-gradient(ellipse 50% 70% at 75% 65%,rgba(145,125,95,0.05) 0%,transparent 100%);pointer-events:none;z-index:0;}
+
+/* ===== 通用阶段 ===== */
+.phase{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;transition:opacity 0.7s ease;}
+.phase.hidden{opacity:0;pointer-events:none;}
+
+/* ===== PHASE 1 标题 ===== */
+#phase-title{gap:1.1em;}
+.game-title{font-size:clamp(2.6rem,8vw,5rem);font-weight:300;color:var(--ink);letter-spacing:0.35em;position:relative;}
+.game-title::after{content:'';position:absolute;bottom:-8px;left:8%;right:8%;height:1px;background:linear-gradient(to right,transparent,rgba(26,20,16,0.4),transparent);}
+.game-sub{font-size:0.78rem;color:rgba(26,20,16,0.38);letter-spacing:0.5em;margin-top:0.3em;}
+.seal-badge{font-size:0.58rem;color:var(--red);border:1.5px solid var(--red);padding:0.22em 0.55em;letter-spacing:0.18em;opacity:0.78;margin:0.3em 0;}
+.btn-ink{background:none;border:1px solid rgba(26,20,16,0.22);color:var(--ink2);font-family:inherit;font-size:0.8rem;letter-spacing:0.28em;padding:0.65em 2em;cursor:pointer;transition:all 0.22s;margin-top:0.8em;}
+.btn-ink:hover{background:rgba(26,20,16,0.04);border-color:rgba(26,20,16,0.48);}
+
+/* ===== PHASE 2 写字 ===== */
+#phase-write{gap:1.4em;}
+.write-hint{font-size:0.78rem;color:rgba(26,20,16,0.38);letter-spacing:0.25em;}
+#paper-surface{width:min(310px,88vw);background:rgba(255,253,248,0.96);border:1px solid rgba(26,20,16,0.1);box-shadow:2px 5px 18px rgba(26,20,16,0.09),inset 0 0 35px rgba(200,180,140,0.07);padding:2.2em 2em;position:relative;display:flex;flex-direction:column;gap:0.9em;align-items:center;}
+#paper-surface::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(to right,transparent,rgba(26,20,16,0.07),transparent);}
+.paper-label{font-size:0.65rem;color:rgba(26,20,16,0.28);letter-spacing:0.22em;align-self:flex-start;}
+#boat-text-input{width:100%;background:transparent;border:none;border-bottom:1px solid rgba(26,20,16,0.13);font-family:'Noto Serif SC',serif;font-size:0.96rem;font-weight:300;color:var(--ink);letter-spacing:0.1em;padding:0.28em 0;text-align:center;outline:none;resize:none;line-height:1.8;}
+#boat-text-input::placeholder{color:rgba(26,20,16,0.18);font-size:0.82rem;}
+#boat-text-input:focus{border-bottom-color:rgba(26,20,16,0.32);}
+.char-count{font-size:0.58rem;color:rgba(26,20,16,0.18);align-self:flex-end;}
+
+/* ===== PHASE 3 折纸 ===== */
+#phase-fold{background:var(--paper);}
+#fold-stage{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;}
+#fold-svg{transition:all 0.55s cubic-bezier(0.4,0,0.2,1);}
+.fold-label{font-size:0.72rem;color:rgba(26,20,16,0.32);letter-spacing:0.22em;margin-top:1.2em;min-height:1.4em;text-align:center;}
+
+/* ===== PHASE 4 游戏 ===== */
+#phase-game{z-index:1;display:block;background:transparent;padding:0;}
+#world{position:absolute;height:100vh;width:5000px;top:0;left:0;}
+
+/* 进度条 */
+#progress-bar{position:fixed;top:0;left:0;right:0;height:2px;background:rgba(26,20,16,0.05);z-index:50;}
+#progress-fill{height:100%;background:linear-gradient(to right,rgba(26,20,16,0.15),rgba(181,53,42,0.35));width:0%;transition:width 0.4s ease;}
+
+/* 位置标签 */
+#location-label{position:fixed;top:1.4em;left:50%;transform:translateX(-50%);font-size:0.66rem;color:var(--red);letter-spacing:0.3em;z-index:50;opacity:0;transition:opacity 0.5s;pointer-events:none;}
+#location-label.show{opacity:0.8;}
+
+/* 拨船提示 */
+#swipe-hint{position:fixed;bottom:8em;left:50%;transform:translateX(-50%);font-size:0.68rem;color:rgba(26,20,16,0.28);letter-spacing:0.2em;z-index:50;opacity:0;transition:opacity 0.4s;pointer-events:none;}
+#swipe-hint.show{opacity:1;}
+
+/* 纸船 */
+#boat{position:absolute;width:76px;height:52px;z-index:30;filter:drop-shadow(1px 3px 5px rgba(26,20,16,0.2));cursor:grab;}
+#boat.stuck{animation:stuckWobble 0.5s ease-in-out infinite;}
+@keyframes stuckWobble{0%,100%{transform:rotate(-4deg) translateY(0);}50%{transform:rotate(4deg) translateY(-2px);}}
+#boat-inner{animation:boatBob 3.5s ease-in-out infinite;}
+@keyframes boatBob{0%,100%{transform:translateY(0) rotate(-1deg);}50%{transform:translateY(-5px) rotate(1.5deg);}}
+
+/* 故事卡片（弹窗，保持v1.0.0风格） */
+#story-card{position:fixed;bottom:2em;left:50%;transform:translateX(-50%) translateY(18px);width:min(370px,92vw);background:rgba(245,240,232,0.96);border:1px solid rgba(26,20,16,0.1);padding:1.7em 1.9em;opacity:0;pointer-events:none;transition:opacity 0.55s ease,transform 0.55s ease;box-shadow:0 6px 28px rgba(26,20,16,0.1),0 2px 6px rgba(26,20,16,0.07);z-index:50;}
+#story-card::before{content:'';position:absolute;top:0;left:1.8em;right:1.8em;height:1px;background:linear-gradient(to right,transparent,rgba(26,20,16,0.18),transparent);}
+#story-card.visible{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all;}
+.story-location{font-size:0.67rem;color:var(--red);letter-spacing:0.3em;margin-bottom:0.75em;display:flex;align-items:center;gap:0.5em;}
+.story-location::before{content:'';width:18px;height:1px;background:var(--red);opacity:0.55;}
+.story-text{font-size:0.87rem;line-height:2.05;color:var(--ink2);font-weight:300;}
+.story-continue{margin-top:1.1em;font-size:0.68rem;color:rgba(26,20,16,0.28);text-align:right;letter-spacing:0.15em;cursor:pointer;transition:color 0.2s;}
+.story-continue:hover{color:rgba(26,20,16,0.55);}
+
+/* 水波纹点击 */
+.ripple-fx{position:fixed;border-radius:50%;border:1px solid rgba(110,155,175,0.45);width:8px;height:8px;pointer-events:none;animation:rippleFx 0.9s ease-out forwards;z-index:25;}
+@keyframes rippleFx{to{width:64px;height:64px;margin-left:-28px;margin-top:-28px;opacity:0;}}
+
+/* ===== PHASE 5 结尾 ===== */
+#phase-end{z-index:60;background:transparent;}
+#end-ink{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(26,20,16,0) 0%,rgba(26,20,16,0.88) 100%);opacity:0;transition:opacity 2.2s ease;}
+#end-content{position:relative;z-index:2;text-align:center;padding:2em;}
+#end-quote{font-size:clamp(1.05rem,3.5vw,1.5rem);font-weight:300;color:rgba(245,240,232,0);letter-spacing:0.32em;line-height:2.2;transition:color 2.5s ease 1.2s;max-width:480px;}
+#end-quote.reveal{color:rgba(245,240,232,0.87);}
+#end-sub{font-size:0.67rem;color:rgba(245,240,232,0);letter-spacing:0.4em;margin-top:1.4em;transition:color 2s ease 2.8s;}
+#end-sub.reveal{color:rgba(245,240,232,0.38);}
+#end-seal{display:inline-block;font-size:0.52rem;color:rgba(181,53,42,0);border:1px solid rgba(181,53,42,0);padding:0.22em 0.5em;margin-top:1.4em;letter-spacing:0.15em;transition:color 1.5s ease 3.8s,border-color 1.5s ease 3.8s;}
+#end-seal.reveal{color:rgba(181,53,42,0.65);border-color:rgba(181,53,42,0.45);}
+.btn-restart{background:none;border:1px solid rgba(245,240,232,0.18);color:rgba(245,240,232,0);font-family:inherit;font-size:0.7rem;letter-spacing:0.25em;padding:0.58em 1.5em;cursor:pointer;margin-top:2em;transition:color 1.2s ease 4.5s,border-color 1.2s ease 4.5s,background 0.25s;}
+.btn-restart.reveal{color:rgba(245,240,232,0.38);border-color:rgba(245,240,232,0.2);}
+.btn-restart:hover{background:rgba(245,240,232,0.05);}
+</style>
+</head>
+<body>
+
+<!-- PHASE 1: 标题 -->
+<div class="phase" id="phase-title">
+  <h1 class="game-title">纸船漂流</h1>
+  <p class="game-sub">随水而去　随缘而遇</p>
+  <div class="seal-badge">童年 · 渠 · 治愈</div>
+  <button class="btn-ink" onclick="goToWrite()">折一只船</button>
+</div>
+
+<!-- PHASE 2: 写字 -->
+<div class="phase hidden" id="phase-write">
+  <p class="write-hint">在出发前，写一句话给这只船</p>
+  <div id="paper-surface">
+    <span class="paper-label">——写给这只纸船——</span>
+    <textarea id="boat-text-input" placeholder="愿它把你带到想去的地方…" maxlength="20" rows="2"></textarea>
+    <span class="char-count" id="char-count">0 / 20</span>
+  </div>
+  <button class="btn-ink" style="margin-top:1.2em" onclick="goToFold()">折船出发</button>
+</div>
+
+<!-- PHASE 3: 折纸动画 -->
+<div class="phase hidden" id="phase-fold">
+  <div id="fold-stage">
+    <svg id="fold-svg" width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+      <!-- 初始：正方形纸 -->
+      <g id="fold-group">
+        <polygon id="fp-main" points="20,20 160,20 160,160 20,160"
+          fill="rgba(255,253,248,0.97)" stroke="rgba(26,20,16,0.22)" stroke-width="1.2"/>
+        <!-- 折痕虚线 -->
+        <line id="fp-crease1" x1="20" y1="20" x2="160" y2="160" stroke="rgba(26,20,16,0.1)" stroke-width="0.8" stroke-dasharray="4,3"/>
+        <line id="fp-crease2" x1="90" y1="20" x2="90" y2="160" stroke="rgba(26,20,16,0.08)" stroke-width="0.8" stroke-dasharray="4,3"/>
+      </g>
+    </svg>
+  </div>
+  <p class="fold-label" id="fold-msg">准备折叠…</p>
+</div>
+
+<!-- PHASE 4: 主游戏 -->
+<div class="phase hidden" id="phase-game">
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="location-label" id="location-label"></div>
+  <div id="swipe-hint">← 滑动拨开纸船 →</div>
+
+  <div id="world">
+    <!-- 动态生成河流SVG和场景元素 -->
+    <canvas id="river-canvas" style="position:absolute;top:0;left:0;width:5000px;"></canvas>
+    <div id="scene-layer" style="position:absolute;top:0;left:0;width:5000px;height:100vh;pointer-events:none;"></div>
+
+    <!-- 纸船 -->
+    <div id="boat">
+      <div id="boat-inner">
+        <svg width="76" height="52" viewBox="0 0 76 52" xmlns="http://www.w3.org/2000/svg">
+          <!-- 船身 -->
+          <path d="M4 36 Q14 27 38 25 Q62 27 72 36 Q60 44 38 43 Q16 44 4 36Z"
+                fill="rgba(250,246,240,0.97)" stroke="rgba(26,20,16,0.35)" stroke-width="1"/>
+          <!-- 船帆 -->
+          <path d="M38 25 L38 7 L24 23Z"
+                fill="rgba(248,244,238,0.88)" stroke="rgba(26,20,16,0.25)" stroke-width="0.8"/>
+          <!-- 折痕 -->
+          <line x1="38" y1="25" x2="38" y2="43" stroke="rgba(26,20,16,0.12)" stroke-width="0.6"/>
+          <line x1="4" y1="36" x2="38" y2="25" stroke="rgba(26,20,16,0.08)" stroke-width="0.5"/>
+          <line x1="72" y1="36" x2="38" y2="25" stroke="rgba(26,20,16,0.08)" stroke-width="0.5"/>
+          <text id="boat-text-display" x="38" y="38" text-anchor="middle"
+                font-family="Noto Serif SC,serif" font-size="5.5"
+                fill="rgba(26,20,16,0.4)" letter-spacing="0.3"></text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- 故事卡片 -->
+  <div id="story-card">
+    <div class="story-location" id="story-location"></div>
+    <p class="story-text" id="story-text"></p>
+    <div class="story-continue" onclick="dismissStory()">继续漂流 →</div>
+  </div>
+</div>
+
+<!-- PHASE 5: 结尾 -->
+<div class="phase hidden" id="phase-end">
+  <div id="end-ink"></div>
+  <div id="end-content">
+    <div id="end-quote"></div>
+    <div id="end-sub">纸船已漂向远处</div>
+    <div id="end-seal">童年 · 渠 · 治愈</div><br>
+    <button class="btn-restart" id="btn-restart" onclick="location.reload()">再折一只</button>
+  </div>
+</div>
+
+<script>
+// ==============================
+// 状态
+// ==============================
+let boatText = '';
+let boatX = 60;
+let worldOffset = 0;
+let gameRunning = false;
+let isStuck = false;
+let stuckTimer = null;
+let boatSpeed = 1.0;
+let raf = null;
+const WORLD_W = 5000;
+let storyPaused = false;
+let shownScenes = new Set();
+let waterPhase = 0;
+
+// 河流Y坐标（屏幕比例）
+const RIVER_TOP_PCT = 0.52;
+const RIVER_BOT_PCT = 0.78;
+
+// ==============================
+// 场景故事（底部弹窗）
+// ==============================
+const scenes = [
+  {x:300,  location:'渠边·起点', text:'清晨的水还凉着。你把纸船放进渠里，它轻轻晃了两下，顺着流走了。岸上有只麻雀，歪头看了一眼，又飞走了。'},
+  {x:900,  location:'石拱桥下',  text:'桥洞里有回声，流水声在里面变得很响。桥墩上长了青苔，湿漉漉的。纸船从桥下钻过去，又出现在另一边的光里。'},
+  {x:1600, location:'芦苇荡旁', text:'芦苇比人还高。风来的时候，它们齐齐低头，又齐齐抬起来。纸船撞进芦苇边缘，在水草里打了个转，又漂出来了。'},
+  {x:2400, location:'渠心·深水处', text:'这段水流快了一些，水面起着细碎的皱纹。有几条小鱼跟着纸船游，游了一段，又散开了。'},
+  {x:3200, location:'陌生的渠道', text:'你已经不认识这里了。两边的院子换了样子，有人在晾衣服，没有注意到水面上漂着的纸船。'},
+  {x:4200, location:'你回头的地方', text:'脚步停在这里。纸船继续往前漂，你站在岸上看着它越来越小。它替你去了你没有去过的地方。'},
+];
+
+// 障碍物（x坐标, type）
+const obstacles = [
+  {x:520,  type:'rock',      size:26, label:'大石头挡住了'},
+  {x:780,  type:'weed',      size:20, label:'水草缠住了'},
+  {x:1200, type:'whirlpool', size:28, label:'漩涡转起来了'},
+  {x:1900, type:'rock',      size:22, label:'石头挡着'},
+  {x:2200, type:'weed',      size:18, label:'水草又来了'},
+  {x:2800, type:'whirlpool', size:30, label:'水流打旋'},
+  {x:3500, type:'rock',      size:24, label:'石头'},
+  {x:3900, type:'weed',      size:20, label:'水草'},
+  {x:4400, type:'whirlpool', size:26, label:'最后一个漩涡'},
+];
+
+// ==============================
+// Phase切换
+// ==============================
+function switchPhase(fromId, toId){
+  const from = document.getElementById(fromId);
+  const to   = document.getElementById(toId);
+  from.style.opacity = '0';
+  setTimeout(()=>{
+    from.classList.add('hidden');
+    to.classList.remove('hidden');
+    to.style.opacity = '0';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      to.style.transition = 'opacity 0.65s ease';
+      to.style.opacity = '1';
+    }));
+  }, 420);
+}
+
+// ==============================
+// Phase 1 → 2
+// ==============================
+function goToWrite(){ switchPhase('phase-title','phase-write'); }
+
+document.getElementById('boat-text-input').addEventListener('input',function(){
+  const l = this.value.length;
+  document.getElementById('char-count').textContent = l+' / 20';
+  boatText = this.value;
+});
+
+// ==============================
+// Phase 2 → 3 折纸动画
+// ==============================
+function goToFold(){
+  boatText = document.getElementById('boat-text-input').value.trim();
+  switchPhase('phase-write','phase-fold');
+  setTimeout(runFoldAnimation, 500);
+}
+
+function runFoldAnimation(){
+  const svg   = document.getElementById('fold-svg');
+  const msg   = document.getElementById('fold-msg');
+  const main  = document.getElementById('fp-main');
+  const c1    = document.getElementById('fp-crease1');
+  const c2    = document.getElementById('fp-crease2');
+
+  const steps = [
+    // Step1: 对折成三角（右上角折到左下角）
+    ()=>{
+      msg.textContent = '对角折叠…';
+      svg.innerHTML = `
+        <g>
+          <!-- 底层三角 -->
+          <polygon points="20,160 160,160 20,20"
+            fill="rgba(250,246,240,0.97)" stroke="rgba(26,20,16,0.22)" stroke-width="1.2"/>
+          <!-- 折上来的三角（折痕在斜边） -->
+          <polygon points="20,20 160,20 160,160"
+            fill="rgba(248,243,235,0.92)" stroke="rgba(26,20,16,0.18)" stroke-width="1"/>
+          <!-- 折痕 -->
+          <line x1="20" y1="20" x2="160" y2="160" stroke="rgba(26,20,16,0.3)" stroke-width="1.2" stroke-dasharray="5,3"/>
+        </g>`;
+    },
+    // Step2: 再对折成小三角
+    ()=>{
+      msg.textContent = '再折一半…';
+      svg.innerHTML = `
+        <g>
+          <polygon points="90,20 160,160 20,160"
+            fill="rgba(250,246,240,0.97)" stroke="rgba(26,20,16,0.22)" stroke-width="1.2"/>
+          <polygon points="90,20 160,160 90,160"
+            fill="rgba(246,241,233,0.9)" stroke="rgba(26,20,16,0.16)" stroke-width="0.9"/>
+          <line x1="90" y1="20" x2="90" y2="160" stroke="rgba(26,20,16,0.28)" stroke-width="1.1" stroke-dasharray="5,3"/>
+        </g>`;
+    },
+    // Step3: 拉开船帆（立体船型）
+    ()=>{
+      msg.textContent = '撑开船型…';
+      svg.innerHTML = `
+        <g>
+          <!-- 船身主体 -->
+          <path d="M20,145 Q50,130 90,125 Q130,130 160,145 Q130,155 90,153 Q50,155 20,145Z"
+            fill="rgba(250,246,240,0.97)" stroke="rgba(26,20,16,0.32)" stroke-width="1.1"/>
+          <!-- 船帆左 -->
+          <path d="M90,125 L60,55 L90,120Z"
+            fill="rgba(246,241,233,0.88)" stroke="rgba(26,20,16,0.22)" stroke-width="0.9"/>
+          <!-- 船帆右 -->
+          <path d="M90,125 L120,70 L90,120Z"
+            fill="rgba(248,244,237,0.82)" stroke="rgba(26,20,16,0.18)" stroke-width="0.8"/>
+          <!-- 折痕细节 -->
+          <line x1="90" y1="125" x2="90" y2="153" stroke="rgba(26,20,16,0.13)" stroke-width="0.7"/>
+          <line x1="20" y1="145" x2="90" y2="125" stroke="rgba(26,20,16,0.09)" stroke-width="0.6"/>
+          <line x1="160" y1="145" x2="90" y2="125" stroke="rgba(26,20,16,0.09)" stroke-width="0.6"/>
+        </g>`;
+    },
+    // Step4: 完成，小船浮在水面
+    ()=>{
+      msg.textContent = '放入水中 ↓';
+      svg.innerHTML = `
+        <g>
+          <!-- 水面倒影淡淡的 -->
+          <ellipse cx="90" cy="158" rx="55" ry="6" fill="rgba(110,155,175,0.12)"/>
+          <!-- 船身 -->
+          <path d="M28,125 Q52,115 90,112 Q128,115 152,125 Q128,134 90,133 Q52,134 28,125Z"
+            fill="rgba(250,246,240,0.97)" stroke="rgba(26,20,16,0.33)" stroke-width="1.1"/>
+          <!-- 帆 -->
+          <path d="M90,112 L65,52 L90,108Z"
+            fill="rgba(246,241,233,0.9)" stroke="rgba(26,20,16,0.22)" stroke-width="0.9"/>
+          <path d="M90,112 L115,65 L90,108Z"
+            fill="rgba(248,244,237,0.84)" stroke="rgba(26,20,16,0.17)" stroke-width="0.8"/>
+          <line x1="90" y1="112" x2="90" y2="133" stroke="rgba(26,20,16,0.12)" stroke-width="0.7"/>
+        </g>`;
+      setTimeout(startGame, 900);
+    },
+  ];
+
+  let i = 0;
+  const run = ()=>{ if(i<steps.length){ steps[i](); i++; setTimeout(run,680); } };
+  run();
+}
+
+// ==============================
+// Phase 3 → 4 游戏开始
+// ==============================
+function startGame(){
+  switchPhase('phase-fold','phase-game');
+  document.getElementById('phase-game').style.display='block';
+
+  // 初始化canvas河流
+  const canvas = document.getElementById('river-canvas');
+  canvas.width = WORLD_W;
+  canvas.height = window.innerHeight;
+  canvas.style.height = window.innerHeight+'px';
+  drawRiverScene(canvas);
+
+  // 船的初始位置
+  const vh = window.innerHeight;
+  const riverMidY = vh * ((RIVER_TOP_PCT+RIVER_BOT_PCT)/2) - 26;
+  document.getElementById('boat').style.left = boatX+'px';
+  document.getElementById('boat').style.top  = riverMidY+'px';
+
+  // 船上文字
+  const disp = boatText.length>6 ? boatText.slice(0,5)+'…' : boatText;
+  document.getElementById('boat-text-display').textContent = disp;
+
+  // 障碍物DOM
+  spawnObstacles(vh);
+
+  // 开始循环
+  gameRunning = true;
+  setupInteraction();
+  setTimeout(()=>{ gameLoop(); }, 400);
+}
+
+// ==============================
+// 绘制河流场景（Canvas水墨风格）
+// ==============================
+function drawRiverScene(canvas){
+  const ctx = canvas.getContext('2d');
+  const W = WORLD_W;
+  const H = canvas.height;
+  const rTop = H * RIVER_TOP_PCT;
+  const rBot = H * RIVER_BOT_PCT;
+  const rMid = (rTop+rBot)/2;
+  const rH   = rBot - rTop;
+
+  // ---- 天空/纸面背景 ----
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(0, 0, W, H);
+
+  // 淡淡的宣纸晕染
+  const skyGrad = ctx.createLinearGradient(0,0,0,rTop);
+  skyGrad.addColorStop(0,'rgba(235,228,215,0.18)');
+  skyGrad.addColorStop(1,'rgba(245,240,232,0)');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0,0,W,rTop+20);
+
+  // ---- 水墨远山（多层） ----
+  function drawMountainRange(yBase, amp, freq, alpha, blur){
+    ctx.save();
+    if(blur){ ctx.filter=`blur(${blur}px)`; }
+    ctx.beginPath();
+    ctx.moveTo(0, yBase);
+    for(let x=0; x<=W; x+=8){
+      const y = yBase - Math.abs(Math.sin(x*freq + 0.3)*amp)
+                      - Math.abs(Math.sin(x*freq*1.7+1.2)*amp*0.5)
+                      - Math.abs(Math.sin(x*freq*0.5+2.1)*amp*0.35);
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.lineTo(W, rTop);
+    ctx.lineTo(0, rTop);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(26,20,16,${alpha})`;
+    ctx.fill();
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+  drawMountainRange(rTop-10, 80, 0.0008, 0.028, 5);
+  drawMountainRange(rTop-5,  55, 0.0015, 0.038, 3);
+  drawMountainRange(rTop+2,  35, 0.0025, 0.048, 2);
+
+  // ---- 河流主体 ----
+  // 上岸线（带自然起伏）
+  function riverY(x, side){
+    const base = side==='top' ? rTop : rBot;
+    return base + Math.sin(x*0.0012)*12 + Math.sin(x*0.0031+1)*6 + Math.sin(x*0.007+2)*3;
+  }
+
+  // 河流填充
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, riverY(0,'top'));
+  for(let x=0;x<=W;x+=6) ctx.lineTo(x, riverY(x,'top'));
+  ctx.lineTo(W, riverY(W,'bot'));
+  for(let x=W;x>=0;x-=6) ctx.lineTo(x, riverY(x,'bot'));
+  ctx.closePath();
+  const waterGrad = ctx.createLinearGradient(0,rTop,0,rBot);
+  waterGrad.addColorStop(0,'rgba(130,175,200,0.22)');
+  waterGrad.addColorStop(0.4,'rgba(110,158,182,0.28)');
+  waterGrad.addColorStop(1,'rgba(90,138,165,0.18)');
+  ctx.fillStyle = waterGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // 上岸线（水墨笔触感——多根线叠加）
+  function drawBankLine(side, w, alpha){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0, riverY(0,side));
+    for(let x=0;x<=W;x+=5) ctx.lineTo(x, riverY(x,side));
+    ctx.strokeStyle = `rgba(40,65,85,${alpha})`;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+  }
+  drawBankLine('top',1.8,0.42);
+  drawBankLine('top',0.8,0.25);
+  drawBankLine('bot',1.5,0.35);
+  drawBankLine('bot',0.7,0.20);
+
+  // ---- 水面波纹（多条细线，水墨感） ----
+  for(let row=0; row<8; row++){
+    const yOff = rTop + rH*(0.15 + row*0.1);
+    for(let wx=30; wx<W; wx += 90+Math.random()*60){
+      const ww = 25 + Math.random()*45;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(wx, yOff + Math.sin(wx*0.05)*3);
+      ctx.bezierCurveTo(
+        wx+ww*0.33, yOff-2+Math.random()*3,
+        wx+ww*0.66, yOff+2+Math.random()*3,
+        wx+ww,      yOff+Math.sin((wx+ww)*0.05)*3
+      );
+      ctx.strokeStyle = `rgba(55,100,130,${0.12+Math.random()*0.1})`;
+      ctx.lineWidth = 0.6 + Math.random()*0.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ---- 画竹林函数 ----
+  function drawBamboo(cx, bank, count){
+    for(let i=0;i<count;i++){
+      const bx = cx + (i - count/2)*18 + (Math.random()-0.5)*8;
+      const h  = 110 + Math.random()*60;
+      const by = bank==='top' ? riverY(bx,'top') : riverY(bx,'bot');
+      const sign = bank==='top' ? -1 : 1;
+
+      // 竹竿（分节）
+      const nodeH = 22 + Math.random()*10;
+      const alpha = 0.55 - i*0.04;
+      ctx.save();
+      ctx.strokeStyle = `rgba(50,70,40,${alpha})`;
+      ctx.lineWidth = 2.2 - i*0.15;
+      ctx.lineCap = 'round';
+      for(let n=0;n*nodeH<h;n++){
+        const ny0 = by + sign*n*nodeH;
+        const ny1 = by + sign*(n+1)*nodeH;
+        ctx.beginPath();
+        ctx.moveTo(bx + Math.sin(n)*2, ny0);
+        ctx.lineTo(bx + Math.sin(n+1)*2, ny1);
+        ctx.stroke();
+        // 节点横线
+        if(n>0){
+          ctx.beginPath();
+          ctx.moveTo(bx-4+Math.sin(n)*2, ny0);
+          ctx.lineTo(bx+4+Math.sin(n)*2, ny0);
+          ctx.strokeStyle = `rgba(50,70,40,${alpha*0.6})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+
+      // 竹叶（每节2-3片）
+      for(let li=0;li<3;li++){
+        const leafY = by + sign*(30+li*nodeH + Math.random()*15);
+        const leafAng = (Math.random()-0.5)*1.2 + (bank==='top'?-0.3:0.3);
+        const leafL = 18+Math.random()*12;
+        ctx.save();
+        ctx.translate(bx+(Math.random()-0.5)*12, leafY);
+        ctx.rotate(leafAng);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.bezierCurveTo(leafL*0.3,-4,leafL*0.7,-5,leafL,0);
+        ctx.bezierCurveTo(leafL*0.7,4,leafL*0.3,4,0,0);
+        ctx.fillStyle = `rgba(45,68,38,${0.38-Math.random()*0.1})`;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  // ---- 画芦苇函数 ----
+  function drawReed(cx, bank, count){
+    for(let i=0;i<count;i++){
+      const rx = cx + (i-count/2)*14 + (Math.random()-0.5)*6;
+      const h  = 70 + Math.random()*40;
+      const ry = bank==='top' ? riverY(rx,'top') : riverY(rx,'bot');
+      const sign = bank==='top' ? -1 : 1;
+      const alpha = 0.45 - i*0.03;
+
+      ctx.save();
+      ctx.strokeStyle = `rgba(90,80,45,${alpha})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      const topY = ry + sign*h;
+      ctx.moveTo(rx, ry);
+      ctx.bezierCurveTo(rx+(Math.random()-0.5)*8, ry+sign*h*0.5, rx+(Math.random()-0.5)*10, topY-sign*10, rx+(Math.random()-0.5)*5, topY);
+      ctx.stroke();
+
+      // 穗子
+      ctx.save();
+      ctx.fillStyle = `rgba(80,65,35,${alpha*0.9})`;
+      ctx.beginPath();
+      const px = rx+(Math.random()-0.5)*5;
+      ctx.ellipse(px, topY+sign*8, 2.5, 9, (Math.random()-0.5)*0.3, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+      ctx.restore();
+    }
+  }
+
+  // ---- 画石拱桥函数 ----
+  function drawBridge(cx){
+    const ty = riverY(cx,'top');
+    const by = riverY(cx,'bot');
+    const bw = 110;
+    const archH = 38;
+    ctx.save();
+    // 桥面石板
+    ctx.fillStyle = 'rgba(26,20,16,0.28)';
+    ctx.beginPath();
+    ctx.rect(cx-bw/2-8, ty-22, bw+16, 20);
+    ctx.fill();
+    // 桥墩左
+    ctx.fillStyle = 'rgba(26,20,16,0.32)';
+    ctx.fillRect(cx-bw/2-6, ty-2, 14, by-ty+12);
+    // 桥墩右
+    ctx.fillRect(cx+bw/2-8, ty-2, 14, by-ty+12);
+    // 拱洞
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.ellipse(cx, ty+archH*0.1, bw/2-12, archH, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.restore();
+    // 拱线描边
+    ctx.strokeStyle = 'rgba(26,20,16,0.4)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.ellipse(cx, ty+archH*0.1, bw/2-12, archH, 0, Math.PI, 0);
+    ctx.stroke();
+    // 石块纹理（横缝）
+    ctx.strokeStyle = 'rgba(26,20,16,0.12)';
+    ctx.lineWidth = 0.7;
+    for(let yi=0;yi<3;yi++){
+      ctx.beginPath();
+      ctx.moveTo(cx-bw/2-8, ty-22+yi*7);
+      ctx.lineTo(cx+bw/2+8, ty-22+yi*7);
+      ctx.stroke();
+    }
+    // 水墨阴影渗透
+    ctx.filter='blur(3px)';
+    ctx.fillStyle='rgba(26,20,16,0.08)';
+    ctx.fillRect(cx-bw/2-14, ty-26, bw+28, 30);
+    ctx.filter='none';
+    ctx.restore();
+  }
+
+  // ---- 画石头（水中）----
+  function drawRock(cx, size){
+    const ry = riverY(cx,'top') + (riverY(cx,'bot')-riverY(cx,'top'))*0.35;
+    ctx.save();
+    // 投影
+    ctx.filter='blur(4px)';
+    ctx.fillStyle='rgba(26,20,16,0.12)';
+    ctx.beginPath();
+    ctx.ellipse(cx+4, ry+size*0.4, size*0.9, size*0.35, 0.1, 0, Math.PI*2);
+    ctx.fill();
+    ctx.filter='none';
+    // 石头主体
+    ctx.beginPath();
+    ctx.moveTo(cx-size, ry+size*0.1);
+    ctx.bezierCurveTo(cx-size*0.8,ry-size*0.5, cx-size*0.2,ry-size*0.7, cx+size*0.1,ry-size*0.55);
+    ctx.bezierCurveTo(cx+size*0.55,ry-size*0.65, cx+size*0.9,ry-size*0.3, cx+size,ry+size*0.1);
+    ctx.bezierCurveTo(cx+size*0.7,ry+size*0.5, cx-size*0.6,ry+size*0.5, cx-size,ry+size*0.1);
+    const stoneGrad = ctx.createRadialGradient(cx-size*0.3,ry-size*0.2,0,cx,ry,size*1.1);
+    stoneGrad.addColorStop(0,'rgba(90,80,70,0.72)');
+    stoneGrad.addColorStop(0.6,'rgba(60,52,44,0.65)');
+    stoneGrad.addColorStop(1,'rgba(40,34,28,0.55)');
+    ctx.fillStyle = stoneGrad;
+    ctx.fill();
+    // 高光
+    ctx.beginPath();
+    ctx.ellipse(cx-size*0.3, ry-size*0.25, size*0.25, size*0.12, -0.4, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,250,240,0.18)';
+    ctx.fill();
+    // 水纹（石头周围）
+    for(let ri=1;ri<=3;ri++){
+      ctx.beginPath();
+      ctx.ellipse(cx, ry+size*0.15, size*(0.9+ri*0.45), size*(0.25+ri*0.08), 0, 0, Math.PI*2);
+      ctx.strokeStyle=`rgba(90,130,155,${0.18-ri*0.04})`;
+      ctx.lineWidth=0.6;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---- 画漩涡 ----
+  function drawWhirlpool(cx){
+    const ry = riverY(cx,'top') + (riverY(cx,'bot')-riverY(cx,'top'))*0.5;
+    ctx.save();
+    for(let s=0;s<5;s++){
+      const r = 8+s*7;
+      const alpha = 0.22-s*0.035;
+      ctx.beginPath();
+      // 螺旋近似：用多段弧
+      for(let a=0;a<=Math.PI*2;a+=0.15){
+        const rad = r * (1 - a/(Math.PI*8));
+        const px = cx + rad*Math.cos(a);
+        const py = ry + rad*0.45*Math.sin(a);
+        a===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+      }
+      ctx.strokeStyle=`rgba(70,120,155,${alpha})`;
+      ctx.lineWidth = 1.2-s*0.15;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---- 画水草（水中）----
+  function drawWeed(cx, count){
+    const rTopY = riverY(cx,'top');
+    const rBotY = riverY(cx,'bot');
+    for(let i=0;i<count;i++){
+      const wx = cx + (i-count/2)*16 + (Math.random()-0.5)*8;
+      const wh = 18+Math.random()*22;
+      ctx.save();
+      ctx.strokeStyle=`rgba(50,90,55,${0.3+Math.random()*0.12})`;
+      ctx.lineWidth=1.2;
+      ctx.beginPath();
+      const startY = rBotY - 5;
+      const tipX = wx+(Math.random()-0.5)*18;
+      const tipY = startY - wh;
+      ctx.moveTo(wx, startY);
+      ctx.bezierCurveTo(wx+(Math.random()-0.5)*10, startY-wh*0.4, tipX+(Math.random()-0.5)*8, tipY+wh*0.2, tipX, tipY);
+      ctx.stroke();
+      // 叶片
+      ctx.beginPath();
+      ctx.ellipse(tipX+6, tipY+4, 8, 3, 0.6, 0, Math.PI*2);
+      ctx.fillStyle=`rgba(50,90,55,0.22)`;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ---- 场景分布 ----
+  // 起点竹林
+  drawBamboo(80, 'top', 5);
+  drawBamboo(130, 'bot', 3);
+  // 水草出没
+  drawWeed(430, 4);
+  // 第一道石头（在障碍物520旁）
+  drawRock(520, 22);
+  // 水草（障碍物780）
+  drawWeed(780, 5);
+  // 第一座桥
+  drawBridge(860);
+  // 漩涡视觉（障碍物1200）
+  drawWhirlpool(1200);
+  // 竹林中段
+  drawBamboo(1100, 'top', 4);
+  // 芦苇段
+  drawReed(1400, 'bot', 6);
+  drawReed(1550, 'bot', 4);
+  // 石头
+  drawRock(1900, 19);
+  // 第二座桥（更古朴）
+  drawBridge(2100);
+  // 水草
+  drawWeed(2200, 6);
+  // 芦苇上岸
+  drawReed(2400, 'top', 5);
+  // 漩涡2
+  drawWhirlpool(2800);
+  // 竹林远段
+  drawBamboo(2700, 'top', 4);
+  drawBamboo(2950, 'bot', 3);
+  // 石头
+  drawRock(3500, 21);
+  // 水草
+  drawWeed(3900, 4);
+  // 芦苇远处
+  drawReed(3600, 'bot', 7);
+  // 漩涡3
+  drawWhirlpool(4400);
+  // 最后竹林
+  drawBamboo(4600, 'top', 6);
+  drawBamboo(4750, 'bot', 4);
+
+  // ---- 装饰：水面上偶尔落叶 ----
+  for(let l=0;l<25;l++){
+    const lx = 200 + Math.random()*(W-400);
+    const ly = riverY(lx,'top') + (riverY(lx,'bot')-riverY(lx,'top'))*(0.2+Math.random()*0.5);
+    ctx.save();
+    ctx.translate(lx,ly);
+    ctx.rotate((Math.random()-0.5)*1.5);
+    ctx.beginPath();
+    ctx.ellipse(0,0,5+Math.random()*4,2.5+Math.random()*2,0,0,Math.PI*2);
+    ctx.fillStyle=`rgba(90,75,40,${0.12+Math.random()*0.1})`;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ==============================
+// 障碍物DOM（交互层）
+// ==============================
+function spawnObstacles(vh){
+  const layer = document.getElementById('scene-layer');
+  obstacles.forEach(ob=>{
+    const el = document.createElement('div');
+    el.id = 'obs_'+ob.x;
+    el.style.cssText = `position:absolute;left:${ob.x-ob.size}px;top:${vh*(RIVER_TOP_PCT+RIVER_BOT_PCT)/2-ob.size}px;width:${ob.size*2}px;height:${ob.size*2}px;pointer-events:none;transition:opacity 0.5s;`;
+    // 障碍物交互光晕（半透明圆形，给玩家视觉提示）
+    el.innerHTML = `<svg width="${ob.size*2}" height="${ob.size*2}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="24" fill="rgba(181,53,42,0.04)" stroke="rgba(181,53,42,0.15)" stroke-width="1" stroke-dasharray="4,3"/>
+    </svg>`;
+    layer.appendChild(el);
+  });
+}
+
+// ==============================
+// 游戏主循环
+// ==============================
+let waveOffset = 0;
+function gameLoop(){
+  if(!gameRunning) return;
+  waveOffset += 0.02;
+
+  if(!isStuck && !storyPaused){
+    boatX += boatSpeed;
+    const progress = boatX / WORLD_W;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // 镜头跟随（平滑）
+    const targetOffset = Math.max(0, boatX - vw*0.35);
+    worldOffset += (targetOffset - worldOffset) * 0.07;
+    document.getElementById('world').style.transform = `translateX(-${worldOffset}px)`;
+    document.getElementById('boat').style.left = boatX+'px';
+
+    // 船随水波起伏
+    const rTop = vh*RIVER_TOP_PCT;
+    const rBot = vh*RIVER_BOT_PCT;
+    const rMid = (rTop+rBot)/2;
+    const wave = Math.sin(boatX*0.014 + waveOffset)*7 + Math.sin(boatX*0.028+waveOffset*1.3)*3.5;
+    document.getElementById('boat').style.top = (rMid - 26 + wave)+'px';
+
+    document.getElementById('progress-fill').style.width = (progress*100)+'%';
+
+    checkObstacles();
+    checkScenes();
+
+    if(boatX > WORLD_W-120){ endJourney(); return; }
+  }
+
+  raf = requestAnimationFrame(gameLoop);
+}
+
+// ==============================
+// 障碍物碰撞
+// ==============================
+function checkObstacles(){
+  for(let ob of obstacles){
+    if(ob.passed) continue;
+    if(Math.abs(boatX - ob.x) < 40){
+      ob.passed = true;
+      isStuck = true;
+      document.getElementById('boat').classList.add('stuck');
+      document.getElementById('swipe-hint').textContent = ob.label+'　← 滑动拨开 →';
+      document.getElementById('swipe-hint').classList.add('show');
+      stuckTimer = setTimeout(()=>{ if(isStuck) unstuck(); }, 4200);
+      break;
+    }
+  }
+}
+function unstuck(){
+  isStuck = false;
+  document.getElementById('boat').classList.remove('stuck');
+  document.getElementById('swipe-hint').classList.remove('show');
+  clearTimeout(stuckTimer);
+  // 冲出
+  const orig = boatSpeed;
+  boatSpeed = 2.8;
+  setTimeout(()=>{ boatSpeed = orig; }, 700);
+  createRipple();
+  // 淡出障碍物提示
+  const el = document.getElementById('obs_'+(obstacles.find(o=>o.passed&&!o._gone)||{x:'x'}).x);
+  if(el){ el.style.opacity='0'; }
+}
+
+// ==============================
+// 场景故事弹窗
+// ==============================
+function checkScenes(){
+  for(let i=0;i<scenes.length;i++){
+    if(shownScenes.has(i)) continue;
+    const sc = scenes[i];
+    if(boatX>sc.x && boatX<sc.x+60){
+      shownScenes.add(i);
+      storyPaused = true;
+      document.getElementById('story-location').textContent = sc.location;
+      document.getElementById('story-text').textContent = sc.text;
+      document.getElementById('story-card').classList.add('visible');
+      showLocationLabel(sc.location);
+    }
+  }
+}
+function dismissStory(){
+  document.getElementById('story-card').classList.remove('visible');
+  setTimeout(()=>{ storyPaused = false; }, 300);
+}
+function showLocationLabel(txt){
+  const el = document.getElementById('location-label');
+  el.textContent = txt;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+// ==============================
+// 拨船交互
+// ==============================
+function setupInteraction(){
+  let sx=0;
+  const onStart = e=>{ sx = e.touches?e.touches[0].clientX:e.clientX; };
+  const onEnd   = e=>{
+    const ex = e.changedTouches?e.changedTouches[0].clientX:e.clientX;
+    if(isStuck && Math.abs(ex-sx)>18) unstuck();
+    else if(!isStuck) createRipple(ex, e.changedTouches?e.changedTouches[0].clientY:e.clientY);
+  };
+  document.addEventListener('touchstart',onStart,{passive:true});
+  document.addEventListener('touchend',onEnd,{passive:true});
+  document.addEventListener('mousedown',onStart);
+  document.addEventListener('mouseup',onEnd);
+}
+function createRipple(x,y){
+  const boat = document.getElementById('boat');
+  const r = document.createElement('div');
+  r.className='ripple-fx';
+  const rect = boat.getBoundingClientRect();
+  r.style.left=(x||rect.left+38)+'px';
+  r.style.top=(y||rect.top+26)+'px';
+  document.body.appendChild(r);
+  setTimeout(()=>r.remove(),950);
+}
+
+// ==============================
+// 结尾
+// ==============================
+function endJourney(){
+  gameRunning=false;
+  if(raf) cancelAnimationFrame(raf);
+  setTimeout(()=>{
+    document.getElementById('phase-game').classList.add('hidden');
+    const ep = document.getElementById('phase-end');
+    ep.classList.remove('hidden');
+    ep.style.opacity='0';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      ep.style.transition='opacity 0.7s ease';
+      ep.style.opacity='1';
+    }));
+    const quote = boatText || '愿它把你带到想去的地方';
+    document.getElementById('end-quote').textContent='「 '+quote+' 」';
+    setTimeout(()=>document.getElementById('end-ink').style.opacity='1',300);
+    setTimeout(()=>{
+      document.getElementById('end-quote').classList.add('reveal');
+      document.getElementById('end-sub').classList.add('reveal');
+      document.getElementById('end-seal').classList.add('reveal');
+    },900);
+    setTimeout(()=>document.getElementById('btn-restart').classList.add('reveal'),4600);
+  },700);
+}
+</script>
+</body>
+</html>
