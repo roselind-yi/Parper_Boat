@@ -1,4 +1,4 @@
-import { getDb, initDb } from '../../lib/db';
+import { findBoats } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -19,21 +19,7 @@ export default async function handler(req) {
       });
     }
 
-    initDb();
-
-    const db = getDb();
-
-    const boats = db.prepare(`
-      SELECT pb.id, pb.content, pb.path_type, pb.status, pb.created_at,
-             u.username as author_username
-      FROM paper_boats pb
-      JOIN users u ON pb.user_id = u.id
-      WHERE pb.status = 'drifting' AND pb.user_id != ?
-      ORDER BY pb.created_at DESC
-      LIMIT 10
-    `).all(user.id);
-
-    db.close();
+    const boats = await findBoats(user.id, 10);
 
     return new Response(JSON.stringify(boats), {
       status: 200,

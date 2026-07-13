@@ -1,4 +1,3 @@
-import { getDb } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -19,22 +18,11 @@ export default async function handler(req) {
       });
     }
 
-    const db = getDb();
-
-    const result = db.prepare(`
-      SELECT id, username, email, interest_tags, created_at FROM users WHERE id = ?
-    `).get(user.id);
-
-    db.close();
-
-    if (!result) {
-      return new Response(JSON.stringify({ error: 'User not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

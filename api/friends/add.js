@@ -1,4 +1,4 @@
-import { getDb, initDb } from '../../lib/db';
+import { addFriend } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -28,30 +28,7 @@ export default async function handler(req) {
       });
     }
 
-    initDb();
-
-    const db = getDb();
-
-    const existingRelation = db.prepare(`
-      SELECT * FROM friend_relations 
-      WHERE (user_id = ? AND friend_id = ?) 
-         OR (user_id = ? AND friend_id = ?)
-    `).get(user.id, friendId, friendId, user.id);
-
-    if (existingRelation) {
-      db.close();
-      return new Response(JSON.stringify({ error: 'Friend request already exists' }), {
-        status: 409,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    db.prepare(`
-      INSERT INTO friend_relations (user_id, friend_id, status)
-      VALUES (?, ?, 'pending')
-    `).run(user.id, friendId);
-
-    db.close();
+    await addFriend(user.id, friendId);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

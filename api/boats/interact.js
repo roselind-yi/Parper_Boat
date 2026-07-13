@@ -1,4 +1,4 @@
-import { getDb, initDb } from '../../lib/db';
+import { interactBoat } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -35,22 +35,7 @@ export default async function handler(req) {
       });
     }
 
-    initDb();
-
-    const db = getDb();
-
-    db.prepare(`
-      INSERT INTO interactions (boat_id, user_id, type, reply_content)
-      VALUES (?, ?, ?, ?)
-    `).run(boatId, user.id, type, replyContent || null);
-
-    if (type === 'pickup') {
-      db.prepare(`
-        UPDATE paper_boats SET status = 'picked' WHERE id = ?
-      `).run(boatId);
-    }
-
-    db.close();
+    await interactBoat(boatId, user.id, type, replyContent);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

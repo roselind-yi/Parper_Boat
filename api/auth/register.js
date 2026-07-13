@@ -1,4 +1,4 @@
-import { getDb, initDb } from '../../lib/db';
+import { getUserByEmail, getUserByUsername, createUser } from '../../lib/db';
 import { hashPassword } from '../../lib/bcrypt';
 import { generateToken } from '../../lib/jwt';
 
@@ -20,38 +20,37 @@ export default async function handler(req) {
       });
     }
 
-    initDb();
+    const existingEmail = await getUserByEmail(email);
+    if (existingEmail) {
+      return new Response(JSON.stringify({ error: '该邮箱已注册' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    const db = getDb();
-
-    const existingUser = db.prepare(`
-      SELECT * FROM users WHERE username = ? OR email = ?
-    `).get(username, email);
-
-    if (existingUser) {
-      db.close();
-      return new Response(JSON.stringify({ error: 'User already exists' }), {
+    const existingUsername = await getUserByUsername(username);
+    if (existingUsername) {
+      return new Response(JSON.stringify({ error: '该用户名已被使用' }), {
         status: 409,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const hashedPassword = await hashPassword(password);
-
-    const result = db.prepare(`
-      INSERT INTO users (username, email, password, interest_tags)
-      VALUES (?, ?, ?, ?)
-    `).run(username, email, hashedPassword, JSON.stringify(interestTags || []));
-
-    const user = db.prepare(`
-      SELECT id, username, email, interest_tags, created_at FROM users WHERE id = ?
-    `).get(result.lastInsertRowid);
-
-    db.close();
+    const user = await createUser(username, email, hashedPassword);
 
     const token = generateToken(user);
 
-    return new Response(JSON.stringify({ user, token }), {
+    return new Response(JSON.stringify({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        interest_tags: user.interestTags,
+        created_at: user.createdAt,
+      },
+      token,
+    }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     });

@@ -1,4 +1,4 @@
-import { getDb } from '../../lib/db';
+import { getFriends } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -19,18 +19,7 @@ export default async function handler(req) {
       });
     }
 
-    const db = getDb();
-
-    const friends = db.prepare(`
-      SELECT u.id, u.username, u.email, fr.status, fr.created_at
-      FROM friend_relations fr
-      JOIN users u ON (fr.user_id = ? AND fr.friend_id = u.id) 
-                   OR (fr.friend_id = ? AND fr.user_id = u.id)
-      WHERE u.id != ? AND fr.status = 'accepted'
-      ORDER BY fr.created_at DESC
-    `).all(user.id, user.id, user.id);
-
-    db.close();
+    const friends = await getFriends(user.id);
 
     return new Response(JSON.stringify(friends), {
       status: 200,

@@ -1,4 +1,4 @@
-import { getDb, initDb } from '../../lib/db';
+import { getUserByEmail } from '../../lib/db';
 import { comparePassword } from '../../lib/bcrypt';
 import { generateToken } from '../../lib/jwt';
 
@@ -20,18 +20,10 @@ export default async function handler(req) {
       });
     }
 
-    initDb();
-
-    const db = getDb();
-
-    const user = db.prepare(`
-      SELECT * FROM users WHERE email = ?
-    `).get(email);
-
-    db.close();
+    const user = await getUserByEmail(email);
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+      return new Response(JSON.stringify({ error: '邮箱或密码错误' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -40,7 +32,7 @@ export default async function handler(req) {
     const isValidPassword = await comparePassword(password, user.password);
 
     if (!isValidPassword) {
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+      return new Response(JSON.stringify({ error: '邮箱或密码错误' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -48,7 +40,16 @@ export default async function handler(req) {
 
     const token = generateToken(user);
 
-    return new Response(JSON.stringify({ user, token }), {
+    return new Response(JSON.stringify({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        interest_tags: user.interestTags,
+        created_at: user.createdAt,
+      },
+      token,
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

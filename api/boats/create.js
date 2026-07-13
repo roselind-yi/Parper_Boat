@@ -1,4 +1,4 @@
-import { getDb, initDb } from '../../lib/db';
+import { createBoat } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -28,22 +28,15 @@ export default async function handler(req) {
       });
     }
 
-    initDb();
+    const boat = await createBoat(user.id, content, pathType, latitude, longitude);
 
-    const db = getDb();
-
-    const result = db.prepare(`
-      INSERT INTO paper_boats (user_id, content, path_type, latitude, longitude)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(user.id, content, pathType, latitude || null, longitude || null);
-
-    const boat = db.prepare(`
-      SELECT id, content, path_type, status, created_at FROM paper_boats WHERE id = ?
-    `).get(result.lastInsertRowid);
-
-    db.close();
-
-    return new Response(JSON.stringify(boat), {
+    return new Response(JSON.stringify({
+      id: boat.id,
+      content: boat.content,
+      path_type: boat.pathType,
+      status: boat.status,
+      created_at: boat.createdAt,
+    }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     });

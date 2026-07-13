@@ -1,4 +1,4 @@
-import { getDb } from '../../lib/db';
+import { getMyBoats } from '../../lib/db';
 import { authenticate } from '../../lib/jwt';
 
 export default async function handler(req) {
@@ -19,19 +19,7 @@ export default async function handler(req) {
       });
     }
 
-    const db = getDb();
-
-    const boats = db.prepare(`
-      SELECT pb.id, pb.content, pb.path_type, pb.status, pb.created_at, pb.updated_at,
-             COUNT(i.id) as interaction_count
-      FROM paper_boats pb
-      LEFT JOIN interactions i ON pb.id = i.boat_id
-      WHERE pb.user_id = ?
-      GROUP BY pb.id, pb.content, pb.path_type, pb.status, pb.created_at, pb.updated_at
-      ORDER BY pb.created_at DESC
-    `).all(user.id);
-
-    db.close();
+    const boats = await getMyBoats(user.id);
 
     return new Response(JSON.stringify(boats), {
       status: 200,
