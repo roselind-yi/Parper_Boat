@@ -3,7 +3,7 @@
   "version": "2.3.0",
   "description": "纸船漂流 - 情感交互叙事游戏",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vercel dev",
