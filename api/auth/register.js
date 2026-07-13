@@ -20,16 +20,16 @@ export default async function handler(req) {
       });
     }
 
-    await initDb();
+    initDb();
 
-    const client = await getDb();
+    const db = getDb();
 
-    const existingUser = await client.sql`
-      SELECT * FROM users WHERE username = ${username} OR email = ${email}
-    `;
+    const existingUser = db.prepare(`
+      SELECT * FROM users WHERE username = ? OR email = ?
+    `).get(username, email);
 
-    if (existingUser.rows.length > 0) {
-      await client.end();
+    if (existingUser) {
+      db.close();
       return new Response(JSON.stringify({ error: 'User already exists' }), {
         status: 409,
         headers: { 'Content-Type': 'application/json' },
@@ -38,15 +38,17 @@ export default async function handler(req) {
 
     const hashedPassword = await hashPassword(password);
 
-    const result = await client.sql`
+    const result = db.prepare(`
       INSERT INTO users (username, email, password, interest_tags)
-      VALUES (${username}, ${email}, ${hashedPassword}, ${JSON.stringify(interestTags || [])})
-      RETURNING id, username, email, interest_tags, created_at
-    `;
+      VALUES (?, ?, ?, ?)
+    `).run(username, email, hashedPassword, JSON.stringify(interestTags || []));
 
-    await client.end();
+    const user = db.prepare(`
+      SELECT id, username, email, interest_tags, created_at FROM users WHERE id = ?
+    `).get(result.lastInsertRowid);
 
-    const user = result.rows[0];
+    db.close();
+
     const token = generateToken(user);
 
     return new Response(JSON.stringify({ user, token }), {

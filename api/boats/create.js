@@ -28,19 +28,22 @@ export default async function handler(req) {
       });
     }
 
-    await initDb();
+    initDb();
 
-    const client = await getDb();
+    const db = getDb();
 
-    const result = await client.sql`
+    const result = db.prepare(`
       INSERT INTO paper_boats (user_id, content, path_type, latitude, longitude)
-      VALUES (${user.id}, ${content}, ${pathType}, ${latitude || null}, ${longitude || null})
-      RETURNING id, content, path_type, status, created_at
-    `;
+      VALUES (?, ?, ?, ?, ?)
+    `).run(user.id, content, pathType, latitude || null, longitude || null);
 
-    await client.end();
+    const boat = db.prepare(`
+      SELECT id, content, path_type, status, created_at FROM paper_boats WHERE id = ?
+    `).get(result.lastInsertRowid);
 
-    return new Response(JSON.stringify(result.rows[0]), {
+    db.close();
+
+    return new Response(JSON.stringify(boat), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     });

@@ -35,22 +35,22 @@ export default async function handler(req) {
       });
     }
 
-    await initDb();
+    initDb();
 
-    const client = await getDb();
+    const db = getDb();
 
-    await client.sql`
+    db.prepare(`
       INSERT INTO interactions (boat_id, user_id, type, reply_content)
-      VALUES (${boatId}, ${user.id}, ${type}, ${replyContent || null})
-    `;
+      VALUES (?, ?, ?, ?)
+    `).run(boatId, user.id, type, replyContent || null);
 
     if (type === 'pickup') {
-      await client.sql`
-        UPDATE paper_boats SET status = 'picked' WHERE id = ${boatId}
-      `;
+      db.prepare(`
+        UPDATE paper_boats SET status = 'picked' WHERE id = ?
+      `).run(boatId);
     }
 
-    await client.end();
+    db.close();
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

@@ -19,22 +19,22 @@ export default async function handler(req) {
       });
     }
 
-    const client = await getDb();
+    const db = getDb();
 
-    const result = await client.sql`
-      SELECT id, username, email, interest_tags, created_at FROM users WHERE id = ${user.id}
-    `;
+    const result = db.prepare(`
+      SELECT id, username, email, interest_tags, created_at FROM users WHERE id = ?
+    `).get(user.id);
 
-    await client.end();
+    db.close();
 
-    if (result.rows.length === 0) {
+    if (!result) {
       return new Response(JSON.stringify({ error: 'User not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify(result.rows[0]), {
+    return new Response(JSON.stringify(result), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

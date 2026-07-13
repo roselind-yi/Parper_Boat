@@ -19,23 +19,23 @@ export default async function handler(req) {
       });
     }
 
-    await initDb();
+    initDb();
 
-    const client = await getDb();
+    const db = getDb();
 
-    const result = await client.sql`
+    const boats = db.prepare(`
       SELECT pb.id, pb.content, pb.path_type, pb.status, pb.created_at,
              u.username as author_username
       FROM paper_boats pb
       JOIN users u ON pb.user_id = u.id
-      WHERE pb.status = 'drifting' AND pb.user_id != ${user.id}
+      WHERE pb.status = 'drifting' AND pb.user_id != ?
       ORDER BY pb.created_at DESC
       LIMIT 10
-    `;
+    `).all(user.id);
 
-    await client.end();
+    db.close();
 
-    return new Response(JSON.stringify(result.rows), {
+    return new Response(JSON.stringify(boats), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

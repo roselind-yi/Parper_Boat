@@ -19,20 +19,20 @@ export default async function handler(req) {
       });
     }
 
-    const client = await getDb();
+    const db = getDb();
 
-    const result = await client.sql`
+    const friends = db.prepare(`
       SELECT u.id, u.username, u.email, fr.status, fr.created_at
       FROM friend_relations fr
-      JOIN users u ON (fr.user_id = ${user.id} AND fr.friend_id = u.id) 
-                   OR (fr.friend_id = ${user.id} AND fr.user_id = u.id)
-      WHERE u.id != ${user.id} AND fr.status = 'accepted'
+      JOIN users u ON (fr.user_id = ? AND fr.friend_id = u.id) 
+                   OR (fr.friend_id = ? AND fr.user_id = u.id)
+      WHERE u.id != ? AND fr.status = 'accepted'
       ORDER BY fr.created_at DESC
-    `;
+    `).all(user.id, user.id, user.id);
 
-    await client.end();
+    db.close();
 
-    return new Response(JSON.stringify(result.rows), {
+    return new Response(JSON.stringify(friends), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

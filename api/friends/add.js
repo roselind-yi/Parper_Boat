@@ -28,30 +28,30 @@ export default async function handler(req) {
       });
     }
 
-    await initDb();
+    initDb();
 
-    const client = await getDb();
+    const db = getDb();
 
-    const existingRelation = await client.sql`
+    const existingRelation = db.prepare(`
       SELECT * FROM friend_relations 
-      WHERE (user_id = ${user.id} AND friend_id = ${friendId}) 
-         OR (user_id = ${friendId} AND friend_id = ${user.id})
-    `;
+      WHERE (user_id = ? AND friend_id = ?) 
+         OR (user_id = ? AND friend_id = ?)
+    `).get(user.id, friendId, friendId, user.id);
 
-    if (existingRelation.rows.length > 0) {
-      await client.end();
+    if (existingRelation) {
+      db.close();
       return new Response(JSON.stringify({ error: 'Friend request already exists' }), {
         status: 409,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    await client.sql`
+    db.prepare(`
       INSERT INTO friend_relations (user_id, friend_id, status)
-      VALUES (${user.id}, ${friendId}, 'pending')
-    `;
+      VALUES (?, ?, 'pending')
+    `).run(user.id, friendId);
 
-    await client.end();
+    db.close();
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

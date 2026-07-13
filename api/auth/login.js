@@ -20,24 +20,23 @@ export default async function handler(req) {
       });
     }
 
-    await initDb();
+    initDb();
 
-    const client = await getDb();
+    const db = getDb();
 
-    const result = await client.sql`
-      SELECT * FROM users WHERE email = ${email}
-    `;
+    const user = db.prepare(`
+      SELECT * FROM users WHERE email = ?
+    `).get(email);
 
-    await client.end();
+    db.close();
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const user = result.rows[0];
     const isValidPassword = await comparePassword(password, user.password);
 
     if (!isValidPassword) {
