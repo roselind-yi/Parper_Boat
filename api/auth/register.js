@@ -1,6 +1,6 @@
-import { getUserByEmail, getUserByUsername, createUser } from '../../lib/db';
-import { hashPassword } from '../../lib/bcrypt';
-import { generateToken } from '../../lib/jwt';
+import { getUserByEmail, getUserByUsername, createUser } from '../../lib/db.js';
+import { hashPassword } from '../../lib/bcrypt.js';
+import { generateToken } from '../../lib/jwt.js';
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -55,7 +55,11 @@ export default async function handler(req) {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('注册错误详情:', error);
+    return new Response(JSON.stringify({
+      error: error.message,
+      stack: error.stack
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
