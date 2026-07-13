@@ -1,5 +1,5 @@
 // 测试端点 —— 验证 API 路由是否正常工作
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   res.status(200).json({
     ok: true,
@@ -12,4 +12,4 @@ module.exports = async (req, res) => {
       hasJwtSecret: !!process.env.JWT_SECRET,
     }
   });
-};
+}

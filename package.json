@@ -2,6 +2,7 @@
   "name": "paper-boat",
   "version": "2.3.0",
   "description": "纸船漂流 - 情感交互叙事游戏",
+  "type": "module",
   "engines": {
     "node": "20.x"
   },
